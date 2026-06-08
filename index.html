@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Frank Jalufka — Producer & Narrative Designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="proto.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="proto-data.jsx"></script>
+<script type="text/babel" src="proto-shell.jsx"></script>
+<script type="text/babel" src="proto-menu.jsx"></script>
+<script type="text/babel" src="proto-board.jsx"></script>
+<script type="text/babel" src="proto-quest.jsx"></script>
+<script type="text/babel" src="proto-extra.jsx"></script>
+
+<script type="text/babel">
+  const { useViewport, C } = window;
+  const NAV_KEY = 'rv-nav-v1';
+
+  function App() {
+    const { mobile } = useViewport();
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(NAV_KEY)) || {}; } catch { return {}; } })();
+    const [screen, setScreen] = React.useState(saved.screen || 'menu');
+    const [questStart, setQuestStart] = React.useState(saved.questStart || null);
+    const [fileStart, setFileStart] = React.useState(saved.fileStart || null);
+    const [toast, setToast] = React.useState(null);
+
+    React.useEffect(() => {
+      try { localStorage.setItem(NAV_KEY, JSON.stringify({ screen, questStart, fileStart })); } catch {}
+    }, [screen, questStart, fileStart]);
+
+    const go = (s) => setScreen(s);
+    const back = () => setScreen('menu');
+    const openQuest = (id) => { setQuestStart(id); setScreen('work'); };
+    const openFile = (id) => { setFileStart(id); setScreen('casefiles'); };
+
+    // Esc → back to menu
+    React.useEffect(() => {
+      const k = (e) => { if (e.key === 'Escape' && screen !== 'menu') { e.preventDefault(); back(); } };
+      window.addEventListener('keydown', k);
+      return () => window.removeEventListener('keydown', k);
+    }, [screen]);
+
+    // Konami nudge: ↑ ↑ ↓ ↓
+    React.useEffect(() => {
+      const want = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
+      let buf = [];
+      const k = (e) => {
+        buf.push(e.key); if (buf.length > want.length) buf.shift();
+        if (want.every((w, i) => buf[i] === w)) {
+          buf = [];
+          setToast({ t: 'ACHIEVEMENT UNLOCKED', s: '“Curiosity” — you read the fine print. So do I, on every milestone.' });
+          setTimeout(() => setToast(null), 4200);
+        }
+      };
+      window.addEventListener('keydown', k);
+      return () => window.removeEventListener('keydown', k);
+    }, []);
+
+    let view;
+    if (screen === 'menu') view = <window.MainMenu onSelect={go} mobile={mobile} />;
+    else if (screen === 'continue') view = <window.ProductionBoard onBack={back} onOpenQuest={openQuest} onOpenFile={openFile} mobile={mobile} />;
+    else if (screen === 'work') view = <window.QuestLog onBack={back} onOpenFile={openFile} startId={questStart} mobile={mobile} />;
+    else if (screen === 'newgame') view = <window.CharacterSheet onBack={back} onGoto={go} mobile={mobile} />;
+    else if (screen === 'casefiles') view = <window.CaseFiles onBack={back} startId={fileStart} mobile={mobile} />;
+    else if (screen === 'contact') view = <window.Contact onBack={back} mobile={mobile} />;
+
+    return (
+      <div style={{ height: '100%', position: 'relative', background: 'var(--bg0)' }}>
+        <div className="fx-vignette"></div>
+        <div key={screen} className="scrn" style={{ height: '100%' }}>{view}</div>
+        <div className="fx-scanline"></div>
+        {toast && (
+          <div style={{ position: 'fixed', bottom: mobile ? 20 : 34, left: '50%', zIndex: 80,
+            animation: 'toast-in .4s cubic-bezier(.2,.7,.3,1) both', display: 'flex', alignItems: 'center', gap: 14,
+            background: 'rgba(15,17,23,.94)', border: `1px solid ${C.gold}`, borderRadius: 12, padding: '14px 20px',
+            boxShadow: '0 18px 50px rgba(0,0,0,.5)', maxWidth: '90vw' }}>
+            <span style={{ fontSize: 22, color: C.gold }}>★</span>
+            <div>
+              <div className="mono" style={{ fontSize: 11, letterSpacing: '.16em', color: C.gold }}>{toast.t}</div>
+              <div style={{ fontSize: 14, color: C.text, marginTop: 3 }}>{toast.s}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
